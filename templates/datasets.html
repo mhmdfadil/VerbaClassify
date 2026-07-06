@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Dataset — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); color: white; }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+.ds-card { background: white; border: 1.5px solid var(--sky-200); border-radius: var(--radius-lg); padding: 1.5rem; transition: all .2s; box-shadow: var(--shadow-sm); }
+.ds-card:hover { border-color: var(--sky-400); box-shadow: var(--shadow-md); }
+.ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap: 1.25rem; }
+.ds-label-bar { display: flex; gap: .5rem; margin: .75rem 0; }
+.ds-bar { height: 8px; border-radius: 999px; }
+.donut { width: 80px; height: 80px; }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link active"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+      <div>
+        <h1>📁 Manajemen Dataset</h1>
+        <p>Kelola dataset CSV untuk training model klasifikasi</p>
+      </div>
+      <a href="{{ url_for('upload_dataset') }}" class="btn btn-primary">📤 Upload Dataset Baru</a>
+    </div>
+
+    {% if datasets %}
+    <div class="ds-grid">
+      {% for ds in datasets %}
+      <div class="ds-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;color:var(--sky-800);font-size:.95rem;word-break:break-all">{{ ds.filename }}</div>
+            <div style="font-size:.78rem;color:var(--slate-400);margin-top:.25rem">{{ ds.uploaded_at[:16].replace('T',' ') if ds.uploaded_at else '—' }}</div>
+            {% if ds.notes %}<div style="font-size:.8rem;color:var(--slate-500);margin-top:.4rem;font-style:italic">{{ ds.notes }}</div>{% endif %}
+          </div>
+          <div style="font-size:2rem;opacity:.35">📄</div>
+        </div>
+
+        <!-- Label distribution bar -->
+        <div style="margin:.875rem 0">
+          {% set total = ds.total_data %}
+          {% set pos_pct = (ds.positif_count / total * 100)|round(1) if total > 0 else 0 %}
+          {% set neg_pct = (ds.negatif_count / total * 100)|round(1) if total > 0 else 0 %}
+          <div class="ds-label-bar">
+            <div class="ds-bar" style="width:{{ pos_pct }}%;background:#16a34a"></div>
+            <div class="ds-bar" style="width:{{ neg_pct }}%;background:#dc2626"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.75rem">
+            <span style="color:#166534">✅ Positif: {{ ds.positif_count }} ({{ pos_pct }}%)</span>
+            <span style="color:#991b1b">❌ Negatif: {{ ds.negatif_count }} ({{ neg_pct }}%)</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.75rem;padding-top:.875rem;border-top:1px solid var(--sky-100)">
+          <span class="badge badge-sky">{{ ds.total_data }} data</span>
+          <div style="display:flex;gap:.5rem">
+            <a href="{{ url_for('dataset_detail', dataset_id=ds.id) }}" class="btn btn-secondary btn-sm">Detail</a>
+            <form method="POST" action="{{ url_for('delete_dataset_route', dataset_id=ds.id) }}" onsubmit="return confirm('Hapus dataset ini? Semua eksperimen terkait juga akan terhapus.')">
+              <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📁</div>
+      <h3>Belum Ada Dataset</h3>
+      <p>Upload file CSV untuk memulai proses klasifikasi.</p>
+      <a href="{{ url_for('upload_dataset') }}" class="btn btn-primary" style="margin-top:1.25rem">📤 Upload Dataset Sekarang</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

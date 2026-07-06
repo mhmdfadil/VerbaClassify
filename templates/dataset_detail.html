@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Detail Dataset — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+.text-truncate { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pagination { display: flex; gap: .5rem; align-items: center; justify-content: flex-end; margin-top: 1rem; }
+.page-btn { padding: .4rem .875rem; border-radius: var(--radius-sm); border: 1.5px solid var(--sky-200); background: white; color: var(--sky-700); font-size: .82rem; font-weight: 600; text-decoration: none; transition: all .2s; }
+.page-btn:hover { background: var(--sky-100); }
+.page-btn.active { background: var(--sky-700); color: white; border-color: var(--sky-700); }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link active"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div style="margin-bottom:1.25rem">
+      <a href="{{ url_for('datasets') }}" style="color:var(--sky-600);text-decoration:none;font-size:.875rem">← Kembali ke Dataset</a>
+    </div>
+
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.75rem">
+      <div>
+        <h1 style="font-family:var(--font-display);font-size:1.75rem;color:var(--sky-900)">📄 {{ ds.filename }}</h1>
+        <p style="color:var(--slate-500);font-size:.875rem;margin-top:.25rem">
+          Diupload {{ ds.uploaded_at[:16].replace('T',' ') if ds.uploaded_at else '—' }}
+          {% if ds.notes %} · {{ ds.notes }}{% endif %}
+        </p>
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <a href="{{ url_for('run_experiment_route') }}" class="btn btn-primary">⚗️ Jalankan Eksperimen</a>
+        <form method="POST" action="{{ url_for('delete_dataset_route', dataset_id=ds.id) }}" onsubmit="return confirm('Hapus dataset ini?')">
+          <button class="btn btn-danger">🗑 Hapus</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="margin-bottom:1.75rem">
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value">{{ ds.total_data }}</div>
+        <div class="stat-label">Total Data</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="color:#16a34a">✅</div>
+        <div class="stat-value" style="color:#16a34a">{{ ds.positif_count }}</div>
+        <div class="stat-label">Positif</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="color:#dc2626">❌</div>
+        <div class="stat-value" style="color:#dc2626">{{ ds.negatif_count }}</div>
+        <div class="stat-label">Negatif</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🧪</div>
+        <div class="stat-value">{{ experiments|length }}</div>
+        <div class="stat-label">Eksperimen</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="card" style="margin-bottom:1.75rem">
+      <div class="card-header">
+        <h3>📝 Sampel Data (Halaman {{ page }})</h3>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px">#</th>
+                <th>Teks Komentar</th>
+                <th style="width:100px">Label</th>
+                <th>Teks Preprocessed</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for row in raw_data %}
+            <tr>
+              <td style="color:var(--slate-400);font-size:.8rem">{{ loop.index + (page-1)*limit }}</td>
+              <td><div class="text-truncate" title="{{ row.full_text }}">{{ row.full_text }}</div></td>
+              <td><span class="badge badge-{{ row.label }}">{{ row.label }}</span></td>
+              <td><div class="text-truncate" style="color:var(--slate-400);font-size:.8rem" title="{{ row.preprocessed_text or '' }}">{{ row.preprocessed_text or '—' }}</div></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" style="padding:1rem 1.5rem">
+          {% if page > 1 %}<a href="?page={{ page-1 }}" class="page-btn">← Prev</a>{% endif %}
+          <span class="page-btn active">{{ page }}</span>
+          {% if raw_data|length == limit %}<a href="?page={{ page+1 }}" class="page-btn">Next →</a>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Experiments on this dataset -->
+    {% if experiments %}
+    <div class="card">
+      <div class="card-header">
+        <h3>🧪 Eksperimen dari Dataset Ini</h3>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Proporsi</th><th>Max Depth</th><th>SMOTE</th><th>Akurasi</th><th>F1-Score</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for exp in experiments %}
+            <tr>
+              <td><strong>{{ exp.proportion_label }}</strong> {% if exp.is_best %}<span class="badge badge-best">★ Best</span>{% endif %}</td>
+              <td>{{ exp.max_depth }}</td>
+              <td>{{ '✅' if exp.use_smote else '—' }}</td>
+              <td><strong>{{ "%.2f%%"|format(exp.accuracy*100) if exp.accuracy else '—' }}</strong></td>
+              <td>{{ "%.2f%%"|format(exp.f1_score*100) if exp.f1_score else '—' }}</td>
+              <td><span class="badge badge-{{ exp.status }}">{{ exp.status }}</span></td>
+              <td><a href="{{ url_for('experiment_detail', exp_id=exp.id) }}" class="btn btn-secondary btn-sm">Detail</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
