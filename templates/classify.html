@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Klasifikasi Teks — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.classify-wrap {
+  max-width: 1200px; margin: 0 auto;
+  padding: 3rem 2rem;
+}
+.classify-header { text-align: center; margin-bottom: 2.5rem; }
+.classify-header h1 { font-family: var(--font-display); font-size: 2.5rem; color: var(--sky-900); }
+.classify-header p { color: var(--slate-500); margin-top: .5rem; font-size: .975rem; }
+
+.classify-card {
+  background: white; border-radius: var(--radius-xl);
+  border: 1.5px solid var(--sky-200);
+  box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.classify-card-head {
+  background: linear-gradient(135deg, var(--sky-700), var(--sky-900));
+  padding: 1.5rem 2rem;
+  color: white;
+}
+.classify-card-head h2 { font-family: var(--font-display); font-size: 1.35rem; font-weight: 500; }
+.classify-card-head p { font-size: .8rem; opacity: .75; margin-top: .25rem; }
+.classify-card-body { padding: 2rem; }
+
+.text-counter { font-size: .78rem; color: var(--slate-400); text-align: right; margin-top: .35rem; }
+
+.result-card {
+  border-radius: var(--radius-lg); padding: 2rem;
+  margin-top: 2rem; animation: fadeIn .4s ease;
+  border: 2px solid; position: relative; overflow: hidden;
+}
+.result-card::before {
+  content: ''; position: absolute;
+  top: -40px; right: -40px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  opacity: .07;
+}
+.result-positif { background: #f0fdf4; border-color: #86efac; }
+.result-positif::before { background: #16a34a; }
+.result-negatif { background: #fff1f2; border-color: #fca5a5; }
+.result-negatif::before { background: #dc2626; }
+.result-label-big {
+  font-family: var(--font-display);
+  font-size: 2.25rem; font-weight: 600; line-height: 1;
+}
+.result-positif .result-label-big { color: #166534; }
+.result-negatif .result-label-big { color: #991b1b; }
+.result-meta { font-size: .875rem; margin-top: .75rem; }
+.result-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+.conf-bar-wrap { background: rgba(0,0,0,.07); border-radius: 999px; height: 6px; flex: 1; margin: 0 .75rem; overflow: hidden; }
+.conf-bar-fill { height: 100%; border-radius: 999px; transition: width .6s ease; }
+.result-positif .conf-bar-fill { background: #16a34a; }
+.result-negatif .conf-bar-fill { background: #dc2626; }
+
+.preprocess-box {
+  background: var(--sky-50); border-radius: var(--radius);
+  padding: 1rem 1.25rem; margin-top: 1rem;
+  border: 1px solid var(--sky-200);
+}
+.preprocess-box .lbl { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--sky-600); margin-bottom: .35rem; }
+.preprocess-box .val { font-size: .85rem; color: var(--slate-700); word-break: break-word; }
+
+.info-note {
+  background: var(--sky-50); border: 1px solid var(--sky-200);
+  border-radius: var(--radius); padding: 1rem 1.25rem;
+  font-size: .82rem; color: var(--sky-800); margin-bottom: 1.5rem;
+  display: flex; align-items: flex-start; gap: .6rem;
+}
+.legend-box {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;
+}
+.legend-item {
+  display: flex; align-items: flex-start; gap: .75rem;
+  padding: 1rem; border-radius: var(--radius);
+  border: 1.5px solid; font-size: .82rem;
+}
+.legend-positif { border-color: #86efac; background: #f0fdf4; }
+.legend-negatif { border-color: #fca5a5; background: #fff1f2; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.legend-positif .legend-dot { background: #16a34a; }
+.legend-negatif .legend-dot { background: #dc2626; }
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@keyframes spin { to { transform:rotate(360deg); } }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="classify-wrap">
+  <div class="classify-header">
+    <h1>Klasifikasi Teks</h1>
+    <p>Masukkan komentar/respon dari Platform X untuk diklasifikasikan menggunakan algoritma ID3 Modifikasi</p>
+  </div>
+
+  {% if not best %}
+  <div class="alert alert-warning" style="margin-bottom:1.5rem;">
+    ⚠️ Model belum tersedia. Administrator perlu mengunggah dataset dan menjalankan eksperimen terlebih dahulu.
+  </div>
+  {% endif %}
+
+  <div class="info-note">
+    <span>ℹ️</span>
+    <div>
+      <strong>Keterangan Label:</strong><br>
+      • <strong>Positif</strong> = Komentar <em>tidak mengandung</em> unsur pelecehan seksual verbal (mendukung korban, edukasi, mengecam pelaku).<br>
+      • <strong>Negatif</strong> = Komentar <em>mengandung</em> unsur pelecehan seksual verbal (komentar merendahkan, melecehkan, normalisasi).
+    </div>
+  </div>
+
+  <div class="classify-card">
+    <div class="classify-card-head">
+      <h2>🔍 Input Teks Komentar</h2>
+      <p>Model terbaik: {% if best %}Proporsi {{ best.proportion_label }} · Akurasi {{ "%.1f%%"|format(best.accuracy*100) }}{% else %}Belum tersedia{% endif %}</p>
+    </div>
+    <div class="classify-card-body">
+      <form method="POST" id="classifyForm">
+        <div class="form-group">
+          <label class="form-label">Teks Komentar/Respon <span class="req">*</span></label>
+          <textarea
+            class="form-textarea"
+            name="text"
+            id="textInput"
+            placeholder="Contoh: Pelaku pelecehan harus dihukum seberat-beratnya. Ini tidak bisa ditoleransi!"
+            rows="5"
+            maxlength="1000"
+            {% if not best %}disabled{% endif %}
+          >{{ input_text }}</textarea>
+          <div class="text-counter"><span id="charCount">{{ input_text|length }}</span>/1000 karakter</div>
+        </div>
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="submitBtn" {% if not best %}disabled{% endif %}>
+          <span id="btnText">Klasifikasikan Teks</span>
+        </button>
+      </form>
+
+      {% if result %}
+      <div class="result-card result-{{ result.label }}">
+        <div class="result-row">
+          <div>
+            <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;opacity:.6;margin-bottom:.35rem">Hasil Klasifikasi</div>
+            <div class="result-label-big">
+              {% if result.label == 'positif' %}✅ Positif{% else %}❌ Negatif{% endif %}
+            </div>
+            <div style="font-size:.8rem;margin-top:.5rem;opacity:.7">
+              {% if result.label == 'positif' %}
+                Tidak mengandung unsur pelecehan verbal
+              {% else %}
+                Mengandung unsur pelecehan verbal
+              {% endif %}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;opacity:.6;margin-bottom:.35rem">Confidence</div>
+            <div style="font-family:var(--font-display);font-size:2rem;font-weight:600">{{ "%.0f%%"|format(result.confidence*100) }}</div>
+          </div>
+        </div>
+        <div class="result-row" style="margin-top:1rem">
+          <span style="font-size:.78rem;font-weight:600;opacity:.6">Confidence Score</span>
+          <div class="conf-bar-wrap">
+            <div class="conf-bar-fill" style="width:{{ (result.confidence*100)|int }}%"></div>
+          </div>
+          <span style="font-size:.78rem;font-weight:600">{{ "%.0f%%"|format(result.confidence*100) }}</span>
+        </div>
+        {% if result.preprocessed %}
+        <div class="preprocess-box">
+          <div class="lbl">Teks Setelah Preprocessing</div>
+          <div class="val">{{ result.preprocessed or '(kosong setelah preprocessing)' }}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend-box">
+    <div class="legend-item legend-positif">
+      <div class="legend-dot"></div>
+      <div>
+        <strong style="color:#166534">Positif</strong><br>
+        <span style="color:#166534;opacity:.8">Komentar tidak mengandung pelecehan. Contoh: dukungan korban, kecaman pelaku, edukasi hukum.</span>
+      </div>
+    </div>
+    <div class="legend-item legend-negatif">
+      <div class="legend-dot"></div>
+      <div>
+        <strong style="color:#991b1b">Negatif</strong><br>
+        <span style="color:#991b1b;opacity:.8">Komentar mengandung pelecehan verbal. Contoh: komentar seksual, merendahkan, normalisasi pelecehan.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const textarea = document.getElementById('textInput');
+const counter = document.getElementById('charCount');
+const form = document.getElementById('classifyForm');
+const btn = document.getElementById('submitBtn');
+const btnText = document.getElementById('btnText');
+
+if (textarea) {
+  textarea.addEventListener('input', () => {
+    counter.textContent = textarea.value.length;
+  });
+}
+
+if (form) {
+  form.addEventListener('submit', () => {
+    if (btn) {
+      btn.disabled = true;
+      btnText.innerHTML = '<span class="spinner"></span> Memproses...';
+    }
+  });
+}
+</script>
+{% endblock %}

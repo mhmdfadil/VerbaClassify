@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Riwayat Prediksi — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+.text-truncate-lg { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conf-mini { display: inline-flex; align-items: center; gap: .4rem; }
+.conf-mini-bar { width: 48px; height: 5px; border-radius: 999px; background: var(--sky-200); overflow: hidden; }
+.conf-mini-fill { height: 100%; border-radius: 999px; }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link active"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+      <div>
+        <h1>🔍 Riwayat Prediksi</h1>
+        <p>Semua prediksi yang dilakukan pengguna melalui halaman klasifikasi publik</p>
+      </div>
+      <!-- Summary Badges -->
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <span class="badge badge-sky" style="font-size:.85rem;padding:.4rem .9rem">Total: {{ stats.total }}</span>
+        <span class="badge badge-positif" style="font-size:.85rem;padding:.4rem .9rem">✅ Positif: {{ stats.positif }}</span>
+        <span class="badge badge-negatif" style="font-size:.85rem;padding:.4rem .9rem">❌ Negatif: {{ stats.negatif }}</span>
+      </div>
+    </div>
+
+    {% if predictions %}
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px">#</th>
+                <th>Teks Input</th>
+                <th>Teks Preprocessed</th>
+                <th style="width:110px">Label</th>
+                <th style="width:120px">Confidence</th>
+                <th style="width:140px">Waktu</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for pred in predictions %}
+            <tr>
+              <td style="color:var(--slate-400);font-size:.8rem">{{ loop.index }}</td>
+              <td>
+                <div class="text-truncate-lg" title="{{ pred.input_text }}">
+                  {{ pred.input_text }}
+                </div>
+              </td>
+              <td>
+                <div class="text-truncate-lg" style="color:var(--slate-400);font-size:.8rem" title="{{ pred.preprocessed_text or '' }}">
+                  {{ pred.preprocessed_text or '—' }}
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-{{ pred.predicted_label }}">
+                  {{ '✅' if pred.predicted_label == 'positif' else '❌' }} {{ pred.predicted_label }}
+                </span>
+              </td>
+              <td>
+                {% set conf_pct = (pred.confidence * 100)|int if pred.confidence else 0 %}
+                <div class="conf-mini">
+                  <div class="conf-mini-bar">
+                    <div class="conf-mini-fill" style="width:{{ conf_pct }}%;background:{{ '#16a34a' if pred.predicted_label == 'positif' else '#dc2626' }}"></div>
+                  </div>
+                  <span style="font-size:.78rem;font-weight:600">{{ conf_pct }}%</span>
+                </div>
+              </td>
+              <td style="color:var(--slate-400);font-size:.78rem">
+                {{ pred.created_at[:16].replace('T',' ') if pred.created_at else '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <h3>Belum Ada Prediksi</h3>
+      <p>Pengguna belum melakukan klasifikasi teks melalui halaman publik.</p>
+      <a href="{{ url_for('classify') }}" class="btn btn-primary" style="margin-top:1.25rem">Coba Klasifikasi →</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
