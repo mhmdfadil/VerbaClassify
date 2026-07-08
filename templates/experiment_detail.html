@@ -1,0 +1,480 @@
+{% extends "base.html" %}
+{% block title %}Detail Eksperimen — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+
+.cm-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .5rem; max-width: 320px; }
+.cm-cell { padding: 1.25rem; border-radius: var(--radius); text-align: center; }
+.cm-tp { background: #dcfce7; }
+.cm-tn { background: #dcfce7; }
+.cm-fp { background: #fff1f2; }
+.cm-fn { background: #fff1f2; }
+.cm-val { font-family: var(--font-display); font-size: 2.25rem; font-weight: 600; }
+.cm-tp .cm-val, .cm-tn .cm-val { color: #166534; }
+.cm-fp .cm-val, .cm-fn .cm-val { color: #991b1b; }
+.cm-lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; margin-top: .25rem; font-weight: 600; opacity: .7; }
+
+.chart-container { position: relative; height: 280px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } .two-col { grid-template-columns: 1fr; } }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link active"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+      <div>
+        <a href="{{ url_for('experiments_list') }}" style="color:var(--sky-600);text-decoration:none;font-size:.875rem">← Kembali ke Eksperimen</a>
+        <h1 style="font-family:var(--font-display);font-size:1.85rem;color:var(--sky-900);margin-top:.35rem">
+          Eksperimen {{ exp.proportion_label }}
+          {% if exp.is_best %}<span class="badge badge-best" style="vertical-align:middle;margin-left:.5rem">★ Best</span>{% endif %}
+        </h1>
+        <p style="color:var(--slate-500);font-size:.875rem;margin-top:.25rem">
+          Dataset: {{ ds.filename if ds else '—' }} · Max Depth: {{ exp.max_depth }} · SMOTE: {{ 'Ya' if exp.use_smote else 'Tidak' }}
+        </p>
+      </div>
+      {% if not exp.is_best and exp.status == 'done' %}
+      <form method="POST" action="{{ url_for('set_best_route', exp_id=exp.id) }}">
+        <button type="submit" class="btn btn-gold" onclick="return confirm('Jadikan model ini sebagai acuan publik?')">⭐ Jadikan Model Terbaik</button>
+      </form>
+      {% elif exp.is_best %}
+      <span class="btn" style="background:#fef9c3;color:#713f12;border:1.5px solid #fde68a;cursor:default">★ Model Aktif Saat Ini</span>
+      {% endif %}
+    </div>
+
+    <!-- Main Metrics -->
+    <div class="metric-box" style="margin-bottom:1.5rem;grid-template-columns:repeat(5,1fr)">
+      <div class="metric-item">
+        <div class="metric-val">{{ "%.2f%%"|format(exp.accuracy*100) if exp.accuracy else '—' }}</div>
+        <div class="metric-lbl">Akurasi</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">{{ "%.2f%%"|format((exp.precision_score or 0)*100) }}</div>
+        <div class="metric-lbl">Presisi</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">{{ "%.2f%%"|format((exp.recall_score or 0)*100) }}</div>
+        <div class="metric-lbl">Recall</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">{{ "%.2f%%"|format((exp.f1_score or 0)*100) }}</div>
+        <div class="metric-lbl">F1-Score</div>
+      </div>
+      <div class="metric-item" style="border:1.5px solid var(--gold);background:#fffbeb">
+        <div class="metric-val" style="color:#92400e;font-size:1.5rem">
+          {% if exp.execution_time %}{{ "%.4f"|format(exp.execution_time) }}s{% else %}—{% endif %}
+        </div>
+        <div class="metric-lbl" style="color:#92400e">Waktu Eksekusi</div>
+      </div>
+    </div>
+    {% if exp.execution_time %}
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;font-size:.82rem">
+      <div style="background:white;border:1px solid var(--sky-200);border-radius:var(--radius);padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem">
+        <span style="color:var(--sky-600)">🏋️ Training:</span>
+        <strong>{{ "%.4f"|format(exp.train_time or 0) }}s</strong>
+      </div>
+      <div style="background:white;border:1px solid var(--sky-200);border-radius:var(--radius);padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem">
+        <span style="color:var(--sky-600)">⚡ Prediksi:</span>
+        <strong>{{ "%.4f"|format(exp.predict_time or 0) }}s</strong>
+      </div>
+      <div style="background:white;border:1px solid var(--sky-200);border-radius:var(--radius);padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem">
+        <span style="color:var(--sky-600)">📊 Data Train:</span>
+        <strong>{{ exp.train_count }}</strong>
+      </div>
+      <div style="background:white;border:1px solid var(--sky-200);border-radius:var(--radius);padding:.6rem 1rem;display:flex;align-items:center;gap:.5rem">
+        <span style="color:var(--sky-600)">🧪 Data Test:</span>
+        <strong>{{ exp.test_count }}</strong>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="two-col">
+      <!-- Confusion Matrix -->
+      <div class="card">
+        <div class="card-header"><h3>🔲 Confusion Matrix</h3></div>
+        <div class="card-body">
+          <div style="display:flex;gap:2rem;align-items:flex-start;flex-wrap:wrap">
+            <div>
+              <div style="font-size:.72rem;text-align:center;color:var(--slate-400);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.35rem">Prediksi →</div>
+              <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.35rem">
+                <div style="width:80px"></div>
+                <div style="text-align:center;flex:1;font-size:.72rem;color:var(--slate-400);font-weight:600">Positif</div>
+                <div style="text-align:center;flex:1;font-size:.72rem;color:var(--slate-400);font-weight:600">Negatif</div>
+              </div>
+              <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.4rem">
+                <div style="width:80px;font-size:.72rem;color:var(--slate-400);font-weight:600;writing-mode:horizontal-tb">Aktual Pos</div>
+                <div class="cm-cell cm-tp" style="flex:1"><div class="cm-val">{{ exp.tp or 0 }}</div><div class="cm-lbl">TP</div></div>
+                <div class="cm-cell cm-fn" style="flex:1"><div class="cm-val">{{ exp.fn or 0 }}</div><div class="cm-lbl">FN</div></div>
+              </div>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <div style="width:80px;font-size:.72rem;color:var(--slate-400);font-weight:600">Aktual Neg</div>
+                <div class="cm-cell cm-fp" style="flex:1"><div class="cm-val">{{ exp.fp or 0 }}</div><div class="cm-lbl">FP</div></div>
+                <div class="cm-cell cm-tn" style="flex:1"><div class="cm-val">{{ exp.tn or 0 }}</div><div class="cm-lbl">TN</div></div>
+              </div>
+            </div>
+            <div style="font-size:.8rem;color:var(--slate-600)">
+              <div style="margin-bottom:.6rem"><strong>TP</strong> = True Positive (prediksi benar: positif)</div>
+              <div style="margin-bottom:.6rem"><strong>TN</strong> = True Negative (prediksi benar: negatif)</div>
+              <div style="margin-bottom:.6rem"><strong>FP</strong> = False Positive (salah: positif)</div>
+              <div><strong>FN</strong> = False Negative (salah: negatif)</div>
+              <hr class="divider" style="margin:.875rem 0">
+              <div>Train: <strong>{{ exp.train_count }}</strong></div>
+              <div>Test: <strong>{{ exp.test_count }}</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-class Metrics -->
+      <div class="card">
+        <div class="card-header"><h3>📊 Metrik Per Kelas</h3></div>
+        <div class="card-body" style="padding:0">
+          {% if details %}
+          <table>
+            <thead><tr><th>Kelas</th><th>Presisi</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr></thead>
+            <tbody>
+            {% for d in details %}
+            <tr>
+              <td><span class="badge badge-{{ d.class_label }}">{{ d.class_label }}</span></td>
+              <td><strong>{{ "%.3f"|format(d.precision_val or 0) }}</strong></td>
+              <td><strong>{{ "%.3f"|format(d.recall_val or 0) }}</strong></td>
+              <td><strong>{{ "%.3f"|format(d.f1_val or 0) }}</strong></td>
+              <td>{{ d.support }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="padding:1.5rem;color:var(--slate-400);text-align:center;font-size:.875rem">Data per kelas tidak tersedia</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Depth Chart — dual axis: Akurasi + Waktu Eksekusi -->
+    {% if depth_results %}
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+        <h3>📈 Pengaruh Max Depth terhadap Akurasi &amp; Waktu Eksekusi (Depth 1–20)</h3>
+        <div style="display:flex;gap:.75rem;font-size:.78rem;flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:.35rem"><span style="width:14px;height:3px;background:#0ea5e9;border-radius:2px;display:inline-block"></span>Akurasi</span>
+          <span style="display:flex;align-items:center;gap:.35rem"><span style="width:14px;height:3px;background:#c8a96e;border-radius:2px;display:inline-block;border-top:2px dashed #c8a96e;background:none"></span>F1-Score</span>
+          <span style="display:flex;align-items:center;gap:.35rem"><span style="width:14px;height:14px;background:#f43f5e;opacity:.7;border-radius:2px;display:inline-block"></span>Waktu (detik)</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Summary table di atas chart -->
+        <div style="overflow-x:auto;margin-bottom:1.25rem">
+          <table style="font-size:.78rem;min-width:700px">
+            <thead>
+              <tr>
+                <th>Max Depth</th>
+                {% for dr in depth_results %}<th style="text-align:center">{{ dr.max_depth }}</th>{% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:600;color:var(--sky-700)">Akurasi (%)</td>
+                {% for dr in depth_results %}
+                <td style="text-align:center;font-weight:{% if loop.index == depth_results|map(attribute='accuracy')|list|max|string and dr.accuracy == depth_results|map(attribute='accuracy')|list|max %}700{% else %}400{% endif %}">
+                  {{ "%.2f"|format((dr.accuracy or 0)*100) }}
+                </td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td style="font-weight:600;color:#c8a96e">F1-Score (%)</td>
+                {% for dr in depth_results %}
+                <td style="text-align:center">{{ "%.2f"|format((dr.f1_score or 0)*100) }}</td>
+                {% endfor %}
+              </tr>
+              <tr>
+                <td style="font-weight:600;color:#f43f5e">Waktu (detik)</td>
+                {% for dr in depth_results %}
+                <td style="text-align:center">{{ "%.4f"|format(dr.execution_time or 0) }}</td>
+                {% endfor %}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Chart dual-axis -->
+        <div style="position:relative;height:340px">
+          <canvas id="depthChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    const depthData  = {{ depth_results | tojson }};
+    const labels     = depthData.map(d => 'Depth ' + d.max_depth);
+    const accVals    = depthData.map(d => parseFloat((d.accuracy * 100).toFixed(2)));
+    const f1Vals     = depthData.map(d => parseFloat(((d.f1_score || 0) * 100).toFixed(2)));
+    const timeVals   = depthData.map(d => parseFloat((d.execution_time || 0).toFixed(4)));
+
+    // Tandai titik akurasi tertinggi
+    const maxAcc     = Math.max(...accVals);
+    const maxAccIdx  = accVals.indexOf(maxAcc);
+    const pointRadii = accVals.map((v, i) => i === maxAccIdx ? 8 : 4);
+    const pointColors= accVals.map((v, i) => i === maxAccIdx ? '#0369a1' : '#0ea5e9');
+
+    new Chart(document.getElementById('depthChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'line',
+            label: 'Akurasi (%)',
+            data: accVals,
+            borderColor: '#0ea5e9',
+            backgroundColor: 'rgba(14,165,233,.07)',
+            borderWidth: 2.5,
+            pointBackgroundColor: pointColors,
+            pointRadius: pointRadii,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.35,
+            yAxisID: 'yAcc',
+            order: 1,
+          },
+          {
+            type: 'line',
+            label: 'F1-Score (%)',
+            data: f1Vals,
+            borderColor: '#c8a96e',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [6, 3],
+            pointBackgroundColor: '#c8a96e',
+            pointRadius: 3,
+            tension: 0.35,
+            yAxisID: 'yAcc',
+            order: 2,
+          },
+          {
+            type: 'bar',
+            label: 'Waktu Eksekusi (s)',
+            data: timeVals,
+            backgroundColor: 'rgba(244,63,94,.18)',
+            borderColor: 'rgba(244,63,94,.6)',
+            borderWidth: 1.5,
+            borderRadius: 4,
+            yAxisID: 'yTime',
+            order: 3,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, padding: 16, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                if (ctx.dataset.yAxisID === 'yTime')
+                  return ` Waktu: ${ctx.parsed.y.toFixed(4)} detik`;
+                return ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`;
+              },
+              afterBody: items => {
+                const idx = items[0]?.dataIndex;
+                if (idx === maxAccIdx) return ['', '★ Akurasi tertinggi pada depth ini!'];
+                return [];
+              }
+            }
+          },
+          annotation: {}
+        },
+        scales: {
+          yAcc: {
+            type: 'linear',
+            position: 'left',
+            title: { display: true, text: 'Akurasi / F1-Score (%)', font: { size: 11 }, color: '#0369a1' },
+            min: Math.max(0, Math.min(...accVals) - 5),
+            max: Math.min(100, Math.max(...accVals) + 5),
+            ticks: { callback: v => v + '%', color: '#0369a1' },
+            grid: { color: 'rgba(14,165,233,.08)' }
+          },
+          yTime: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Waktu Eksekusi (detik)', font: { size: 11 }, color: '#f43f5e' },
+            min: 0,
+            ticks: { callback: v => v.toFixed(3) + 's', color: '#f43f5e' },
+            grid: { drawOnChartArea: false }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 10 } }
+          }
+        }
+      }
+    });
+    </script>
+    {% endif %}
+
+    <!-- Model PKL Detail -->
+    {% if exp.status == 'done' %}
+    <div class="card" style="margin-top:1.5rem" id="model-detail-card">
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+        <h3>🗃️ Detail Model Tersimpan <code style="font-size:.78rem;background:var(--sky-100);color:var(--sky-800);padding:.15rem .45rem;border-radius:4px;font-family:monospace">model_{{ exp.id }}.pkl</code></h3>
+        <button id="btn-load-model" onclick="loadModelDetail()" class="btn" style="font-size:.8rem;padding:.45rem 1rem;background:var(--sky-600);color:white;border:none;cursor:pointer;border-radius:var(--radius)">
+          🔍 Muat Detail Model
+        </button>
+      </div>
+      <div class="card-body" id="model-detail-body">
+        <div style="color:var(--slate-400);font-size:.875rem;text-align:center;padding:1.5rem 0">
+          Klik <strong>Muat Detail Model</strong> untuk membaca informasi dari file <code>.pkl</code>.
+        </div>
+      </div>
+    </div>
+
+    <script>
+    function loadModelDetail() {
+      const body = document.getElementById('model-detail-body');
+      const btn  = document.getElementById('btn-load-model');
+      btn.disabled = true;
+      btn.textContent = '⏳ Memuat...';
+      body.innerHTML = '<div style="color:var(--slate-400);font-size:.875rem;text-align:center;padding:2rem 0">Membaca file model...</div>';
+
+      fetch('/api/experiments/{{ exp.id }}/model-detail')
+        .then(r => r.json())
+        .then(d => {
+          btn.style.display = 'none';
+          if (d.error) {
+            body.innerHTML = `<div style="color:#dc2626;padding:1rem;background:#fff1f2;border-radius:var(--radius)">❌ ${d.error}</div>`;
+            return;
+          }
+
+          // Build top-features bar chart data
+          const topF = d.top_features || [];
+          const maxImp = topF.length > 0 ? topF[0].importance : 1;
+
+          const featureRows = topF.map(f => {
+            const pct = maxImp > 0 ? (f.importance / maxImp * 100).toFixed(1) : 0;
+            const barColor = f.rank <= 3 ? '#0369a1' : f.rank <= 7 ? '#0ea5e9' : '#7dd3fc';
+            return `
+              <tr>
+                <td style="font-weight:600;color:var(--slate-500);text-align:center;width:32px">${f.rank}</td>
+                <td><code style="background:var(--sky-50);padding:.15rem .4rem;border-radius:4px;font-size:.82rem;color:var(--sky-900)">${f.word}</code></td>
+                <td style="width:180px">
+                  <div style="background:var(--sky-100);border-radius:99px;height:10px;overflow:hidden">
+                    <div style="height:10px;border-radius:99px;background:${barColor};width:${pct}%;transition:width .6s ease"></div>
+                  </div>
+                </td>
+                <td style="font-family:monospace;font-size:.8rem;color:var(--slate-600);text-align:right">${f.importance.toFixed(6)}</td>
+              </tr>`;
+          }).join('');
+
+          const classChips = d.class_labels.map(c =>
+            `<span style="background:var(--sky-100);color:var(--sky-800);padding:.25rem .75rem;border-radius:99px;font-size:.82rem;font-weight:600;margin-right:.5rem">${c}</span>`
+          ).join('');
+
+          body.innerHTML = `
+            <!-- Ringkasan 4 kartu -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.75rem">
+
+              <div style="background:linear-gradient(135deg,#e0f2fe,#f0f9ff);border:1.5px solid var(--sky-200);border-radius:var(--radius-lg);padding:1.1rem 1.25rem">
+                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--sky-600);font-weight:600;margin-bottom:.4rem">Max Depth</div>
+                <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:700;color:var(--sky-900)">${d.max_depth}</div>
+                <div style="font-size:.75rem;color:var(--sky-600);margin-top:.2rem">level pohon keputusan</div>
+              </div>
+
+              <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #bbf7d0;border-radius:var(--radius-lg);padding:1.1rem 1.25rem">
+                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#166534;font-weight:600;margin-bottom:.4rem">Jumlah Fitur</div>
+                <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:700;color:#14532d">${d.n_features.toLocaleString()}</div>
+                <div style="font-size:.75rem;color:#166534;margin-top:.2rem">fitur input ke model</div>
+              </div>
+
+              <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:1.5px solid #fde68a;border-radius:var(--radius-lg);padding:1.1rem 1.25rem">
+                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#92400e;font-weight:600;margin-bottom:.4rem">Ukuran Vocab TF-IDF</div>
+                <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:700;color:#78350f">${d.vocab_size.toLocaleString()}</div>
+                <div style="font-size:.75rem;color:#92400e;margin-top:.2rem">len(vectorizer.vocabulary_)</div>
+              </div>
+
+              <div style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1.5px solid #e9d5ff;border-radius:var(--radius-lg);padding:1.1rem 1.25rem">
+                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#6b21a8;font-weight:600;margin-bottom:.4rem">Nama Label Kelas</div>
+                <div style="margin-top:.5rem">${classChips}</div>
+                <div style="font-size:.75rem;color:#7e22ce;margin-top:.5rem">le.classes_</div>
+              </div>
+            </div>
+
+            <!-- Top Feature Importances -->
+            <div style="border-top:1.5px solid var(--sky-100);padding-top:1.25rem">
+              <div style="font-weight:600;color:var(--sky-900);margin-bottom:.75rem;font-size:.95rem">
+                🏆 Top ${topF.length} Kata Paling Berpengaruh
+                <span style="font-size:.75rem;font-weight:400;color:var(--slate-400);margin-left:.5rem">feature_importances_ × get_feature_names_out()</span>
+              </div>
+              ${topF.length > 0 ? `
+              <div style="overflow-x:auto">
+                <table style="font-size:.83rem;width:100%">
+                  <thead>
+                    <tr>
+                      <th style="width:32px;text-align:center">#</th>
+                      <th>Kata / Token</th>
+                      <th>Tingkat Pengaruh</th>
+                      <th style="text-align:right">Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody>${featureRows}</tbody>
+                </table>
+              </div>` : '<div style="color:var(--slate-400);font-size:.85rem">Feature importance tidak tersedia (model mungkin belum terlatih cukup).</div>'}
+            </div>
+          `;
+        })
+        .catch(err => {
+          btn.disabled = false;
+          btn.textContent = '🔍 Muat Detail Model';
+          body.innerHTML = `<div style="color:#dc2626;padding:1rem;background:#fff1f2;border-radius:var(--radius)">❌ Gagal memuat: ${err.message}</div>`;
+        });
+    }
+    </script>
+    {% endif %}
+
+    <!-- Formula Reference -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><h3>📐 Formula ID3 Modifikasi yang Digunakan</h3></div>
+      <div class="card-body">
+        <div style="background:var(--sky-900);border-radius:var(--radius-lg);padding:1.5rem;color:white;font-family:Georgia,serif;line-height:2">
+          <div style="color:var(--sky-300);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;font-family:var(--font-body)">Entropy Modifikasi</div>
+          <div style="font-size:1rem">Ent(D) = <sup>1</sup>/<sub>ln(2)</sub> × [ln(p + n) − <sup>p·ln(p) + n·ln(n)</sup>/<sub>p + n</sub>]</div>
+          <div style="margin-top:.75rem;font-size:1rem">EntA(D) = Σ <sup>|Dⱼ|</sup>/<sub>|D|</sub> × [ln(|Dⱼ|) − <sup>pⱼ</sup>/<sub>|Dⱼ|</sub>·ln(pⱼ) − <sup>nⱼ</sup>/<sub>|Dⱼ|</sub>·ln(nⱼ)]</div>
+          <div style="margin-top:.75rem;font-size:1rem">Gain(A) = Ent(D) − EntA(D)</div>
+          <div style="margin-top:1rem;font-size:.75rem;color:var(--sky-400);font-family:var(--font-body)">Sumber: Asrianda, Mawengkang, Sihombing & Nasution (2025) · JUTIF & EJET</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

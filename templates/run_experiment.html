@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Jalankan Eksperimen — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+
+.prop-grid { display: flex; gap: .875rem; flex-wrap: wrap; }
+.prop-card {
+  border: 2px solid var(--sky-200); border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem; cursor: pointer; transition: all .2s;
+  background: white; min-width: 140px; text-align: center;
+  position: relative;
+}
+.prop-card input[type=checkbox] { position: absolute; opacity: 0; }
+.prop-card:has(input:checked) { border-color: var(--sky-500); background: var(--sky-50); }
+.prop-card-label { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; color: var(--sky-800); }
+.prop-card-sub { font-size: .75rem; color: var(--slate-500); margin-top: .25rem; }
+.prop-card .check-icon { display: none; position: absolute; top: .5rem; right: .5rem; font-size: 1rem; }
+.prop-card:has(input:checked) .check-icon { display: block; }
+
+.depth-slider { appearance: none; width: 100%; height: 6px; border-radius: 999px; background: var(--sky-200); outline: none; }
+.depth-slider::-webkit-slider-thumb { appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--sky-600); cursor: pointer; box-shadow: 0 2px 6px rgba(14,165,233,.4); }
+.depth-val { font-family: var(--font-display); font-size: 2.5rem; font-weight: 600; color: var(--sky-700); text-align: center; line-height: 1; }
+
+.pipeline-steps { display: flex; flex-direction: column; gap: .5rem; }
+.pipeline-step {
+  display: flex; align-items: center; gap: .875rem;
+  padding: .875rem 1rem; background: var(--sky-50);
+  border-radius: var(--radius); border: 1px solid var(--sky-200);
+  font-size: .875rem;
+}
+.step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--sky-700); color: white; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; flex-shrink: 0; }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link active"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div class="page-header">
+      <h1>⚗️ Jalankan Eksperimen</h1>
+      <p>Konfigurasi dan jalankan training model ID3 Modifikasi dengan berbagai proporsi dataset</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 360px;gap:1.5rem;align-items:start">
+      <div>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-header"><h3>⚙️ Konfigurasi Eksperimen</h3></div>
+          <div class="card-body">
+            {% if not datasets %}
+            <div class="alert alert-warning">Belum ada dataset. <a href="{{ url_for('upload_dataset') }}" style="color:var(--sky-700);font-weight:600">Upload dataset terlebih dahulu →</a></div>
+            {% else %}
+            <form method="POST" id="expForm">
+              <div class="form-group">
+                <label class="form-label">Pilih Dataset <span class="req">*</span></label>
+                <select name="dataset_id" class="form-select" required>
+                  <option value="">— Pilih dataset —</option>
+                  {% for ds in datasets %}
+                  <option value="{{ ds.id }}">{{ ds.filename }} ({{ ds.total_data }} data)</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Proporsi Data Training:Testing <span class="req">*</span></label>
+                <p class="form-hint" style="margin-bottom:.75rem">Pilih satu atau lebih proporsi untuk dibandingkan</p>
+                <div class="prop-grid">
+                  {% for prop in ['80:20', '70:30', '60:40', '90:10'] %}
+                  <label class="prop-card">
+                    <input type="checkbox" name="proportions" value="{{ prop }}" {% if prop in ['80:20','70:30'] %}checked{% endif %}>
+                    <div class="check-icon">✅</div>
+                    <div class="prop-card-label">{{ prop }}</div>
+                    <div class="prop-card-sub">
+                      {% if prop == '80:20' %}Train 80% · Test 20%
+                      {% elif prop == '70:30' %}Train 70% · Test 30%
+                      {% elif prop == '60:40' %}Train 60% · Test 40%
+                      {% elif prop == '90:10' %}Train 90% · Test 10%
+                      {% endif %}
+                    </div>
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Max Depth Pohon Keputusan</label>
+                <div class="depth-val" id="depthVal">3</div>
+                <input type="range" name="max_depth" id="depthSlider" class="depth-slider" min="1" max="20" value="3" style="margin:.75rem 0">
+                <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--slate-400)">
+                  <span>1 (Sederhana)</span><span>10</span><span>20 (Kompleks)</span>
+                </div>
+                <p class="form-hint">Akurasi optimal biasanya pada depth 3 (Asrianda et al. 2025)</p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-check">
+                  <input type="checkbox" name="use_smote" checked>
+                  <span>Gunakan SMOTE (Synthetic Minority Over-sampling Technique)</span>
+                </label>
+                <p class="form-hint" style="margin-left:1.6rem">Mengatasi ketidakseimbangan kelas positif dan negatif</p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-check">
+                  <input type="checkbox" name="run_depth_sweep">
+                  <span>Jalankan Sweep Max Depth (1–20)</span>
+                </label>
+                <p class="form-hint" style="margin-left:1.6rem">Analisis pengaruh kedalaman pohon terhadap akurasi (memakan waktu lebih lama)</p>
+                </div>
+
+              <button type="submit" class="btn btn-primary btn-lg" id="runBtn">
+                ▶️ Jalankan Eksperimen
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Pipeline Info -->
+      <div>
+        <div class="card">
+          <div class="card-header"><h3>📋 Alur Pipeline</h3></div>
+          <div class="card-body">
+            <div class="pipeline-steps">
+              <div class="pipeline-step"><div class="step-num">1</div><div><strong>Preprocessing</strong><br><span style="font-size:.78rem;color:var(--slate-500)">Case folding, cleansing, tokenizing, stopword, stemming</span></div></div>
+              <div class="pipeline-step"><div class="step-num">2</div><div><strong>TF-IDF Extraction</strong><br><span style="font-size:.78rem;color:var(--slate-500)">Konversi teks ke representasi numerik</span></div></div>
+              <div class="pipeline-step"><div class="step-num">3</div><div><strong>Split Data</strong><br><span style="font-size:.78rem;color:var(--slate-500)">Proporsi training dan testing</span></div></div>
+              <div class="pipeline-step"><div class="step-num">4</div><div><strong>SMOTE</strong><br><span style="font-size:.78rem;color:var(--slate-500)">Oversampling kelas minoritas</span></div></div>
+              <div class="pipeline-step"><div class="step-num">5</div><div><strong>ID3 Modifikasi</strong><br><span style="font-size:.78rem;color:var(--slate-500)">Training pohon keputusan</span></div></div>
+              <div class="pipeline-step"><div class="step-num">6</div><div><strong>Evaluasi</strong><br><span style="font-size:.78rem;color:var(--slate-500)">Akurasi, presisi, recall, F1-score</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const slider = document.getElementById('depthSlider');
+const depthVal = document.getElementById('depthVal');
+if (slider) {
+  slider.addEventListener('input', () => depthVal.textContent = slider.value);
+}
+document.getElementById('expForm')?.addEventListener('submit', () => {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Memulai...';
+});
+</script>
+{% endblock %}

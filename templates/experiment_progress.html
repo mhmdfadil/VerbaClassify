@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Progress Eksperimen — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+.progress-wrap { max-width: 640px; margin: 0 auto; text-align: center; padding: 4rem 2rem; }
+.progress-icon { font-size: 4rem; margin-bottom: 1.5rem; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.pulsing { animation: pulse 1.5s ease-in-out infinite; }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link active"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div class="progress-wrap">
+      <div class="progress-icon pulsing" id="progressIcon">⚗️</div>
+      <h2 style="font-family:var(--font-display);font-size:2rem;color:var(--sky-900);margin-bottom:.75rem" id="progressTitle">Eksperimen Berjalan</h2>
+      <p style="color:var(--slate-500);margin-bottom:2rem" id="progressMsg">Memulai proses training...</p>
+
+      <div class="progress-bar-wrap" style="margin-bottom:1rem">
+        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <div style="font-size:.82rem;color:var(--slate-400);margin-bottom:2.5rem" id="progressPct">0%</div>
+
+      <div class="alert alert-info" id="infoBox">
+        Proses sedang berjalan di background. Halaman ini akan otomatis mengarahkan ke hasil eksperimen.
+      </div>
+
+      <div id="doneBox" style="display:none;margin-top:1.5rem">
+        <a href="{{ url_for('experiments_list') }}" class="btn btn-primary btn-lg">🧪 Lihat Hasil Eksperimen →</a>
+      </div>
+      <div id="errorBox" style="display:none;margin-top:1.5rem">
+        <div class="alert alert-danger" id="errorMsg"></div>
+        <a href="{{ url_for('run_experiment_route') }}" class="btn btn-secondary">← Kembali</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const taskId = "{{ task_id }}";
+let pollInterval;
+
+function poll() {
+  fetch('/api/task-status/' + taskId)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('progressMsg').textContent = data.message || '...';
+      const pct = data.progress || 0;
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressPct').textContent = pct + '%';
+
+      if (data.status === 'done') {
+        clearInterval(pollInterval);
+        document.getElementById('progressIcon').textContent = '✅';
+        document.getElementById('progressIcon').classList.remove('pulsing');
+        document.getElementById('progressTitle').textContent = 'Eksperimen Selesai!';
+        document.getElementById('progressMsg').textContent = 'Semua proporsi berhasil diproses.';
+        document.getElementById('progressFill').style.width = '100%';
+        document.getElementById('progressPct').textContent = '100%';
+        document.getElementById('infoBox').style.display = 'none';
+        document.getElementById('doneBox').style.display = 'block';
+        setTimeout(() => window.location.href = '/admin/experiments', 2500);
+      } else if (data.status === 'error') {
+        clearInterval(pollInterval);
+        document.getElementById('progressIcon').textContent = '❌';
+        document.getElementById('progressIcon').classList.remove('pulsing');
+        document.getElementById('progressTitle').textContent = 'Terjadi Error';
+        document.getElementById('infoBox').style.display = 'none';
+        document.getElementById('errorBox').style.display = 'block';
+        document.getElementById('errorMsg').textContent = data.message;
+      }
+    })
+    .catch(() => {});
+}
+
+pollInterval = setInterval(poll, 2000);
+poll();
+</script>
+{% endblock %}
