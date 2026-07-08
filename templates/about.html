@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Tentang — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.about-hero {
+  background: linear-gradient(135deg, var(--sky-800), var(--sky-900));
+  color: white; padding: 5rem 2rem; text-align: center;
+}
+.about-hero h1 { font-family: var(--font-display); font-size: 2.75rem; font-weight: 600; }
+.about-hero p { opacity: .75; margin-top: .75rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+.about-section { max-width: 1280px; margin: 0 auto; padding: 4rem 2rem; }
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+.about-grid.reverse { direction: rtl; }
+.about-grid.reverse > * { direction: ltr; }
+
+.step-list { list-style: none; padding: 0; }
+.step-item {
+  display: flex; gap: 1.25rem; margin-bottom: 1.5rem;
+  align-items: flex-start;
+}
+.step-num {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--sky-500), var(--sky-700));
+  color: white; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .875rem; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(14,165,233,.3);
+}
+.step-content h4 { font-weight: 600; color: var(--sky-800); margin-bottom: .3rem; }
+.step-content p { font-size: .875rem; color: var(--slate-600); line-height: 1.6; }
+
+.formula-section { background: var(--sky-900); color: white; padding: 4rem 2rem; }
+.formula-inner { max-width: 900px; margin: 0 auto; text-align: center; }
+.formula-inner h2 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 1.5rem; }
+.formula-block {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--radius-lg); padding: 2rem;
+  font-family: Georgia, serif; font-size: 1.1rem;
+  line-height: 2.2; margin-bottom: 1rem; color: var(--sky-100);
+}
+.formula-note { font-size: .82rem; color: var(--sky-400); }
+
+.author-card {
+  background: white; border: 1.5px solid var(--sky-200);
+  border-radius: var(--radius-xl); padding: 2.5rem;
+  text-align: center; max-width: 520px; margin: 0 auto;
+  box-shadow: var(--shadow-lg);
+}
+.author-avatar {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--sky-500), var(--sky-800));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.5rem; margin: 0 auto 1.25rem;
+}
+.author-name { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; color: var(--sky-900); }
+.author-nim { font-size: .85rem; color: var(--slate-500); margin-top: .25rem; }
+.author-meta { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1rem; }
+
+.ref-card { background: white; border: 1.5px solid var(--sky-200); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: .875rem; }
+.ref-card .ref-title { font-weight: 600; color: var(--sky-800); font-size: .9rem; }
+.ref-card .ref-journal { font-size: .8rem; color: var(--sky-600); margin-top: .25rem; }
+.ref-card .ref-doi { font-size: .75rem; color: var(--slate-400); margin-top: .2rem; font-family: monospace; }
+
+@media (max-width:768px) {
+  .about-grid { grid-template-columns: 1fr; }
+  .about-grid.reverse { direction: ltr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<section class="about-hero">
+  <h1>Tentang VerbaClassify</h1>
+  <p>Sistem klasifikasi respon masyarakat terhadap isu pelecehan seksual verbal berbasis algoritma ID3 Modifikasi</p>
+</section>
+
+<!-- Pipeline -->
+<section style="background:white">
+  <div class="about-section">
+    <div class="about-grid">
+      <div>
+        <h2 style="font-family:var(--font-display);font-size:2rem;color:var(--sky-900);margin-bottom:1.5rem">Alur Sistem Lengkap</h2>
+        <ul class="step-list">
+          <li class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Pengumpulan Data (Scraping)</h4>
+              <p>Data komentar dikumpulkan dari Platform X menggunakan web scraping dengan kata kunci terkait pelecehan seksual verbal, disimpan dalam format CSV.</p>
+            </div>
+          </li>
+          <li class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Text Preprocessing</h4>
+              <p>Pembersihan teks: case folding, cleansing (hapus URL/mention/simbol), normalisasi slang, tokenisasi, stopword removal, dan stemming (Sastrawi).</p>
+            </div>
+          </li>
+          <li class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Ekstraksi Fitur TF-IDF</h4>
+              <p>Konversi teks hasil preprocessing ke representasi numerik menggunakan Term Frequency-Inverse Document Frequency (TF-IDF).</p>
+            </div>
+          </li>
+          <li class="step-item">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <h4>Split Data & SMOTE</h4>
+              <p>Pembagian data training:testing (80:20 dan 70:30), dilanjutkan SMOTE untuk menyeimbangkan distribusi kelas positif dan negatif.</p>
+            </div>
+          </li>
+          <li class="step-item">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <h4>ID3 Modifikasi + Max Depth</h4>
+              <p>Training pohon keputusan menggunakan entropy modifikasi Shannon (natural log). Parameter max_depth diuji dari 1 hingga 20.</p>
+            </div>
+          </li>
+          <li class="step-item">
+            <div class="step-num">6</div>
+            <div class="step-content">
+              <h4>Evaluasi & Seleksi Model Terbaik</h4>
+              <p>Evaluasi dengan accuracy, precision, recall, F1-score, dan confusion matrix. Admin memilih proporsi terbaik sebagai acuan prediksi publik.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <div style="background:var(--sky-50);border-radius:var(--radius-xl);padding:2rem;border:1.5px solid var(--sky-200)">
+          <h3 style="font-family:var(--font-display);font-size:1.35rem;color:var(--sky-800);margin-bottom:1.25rem">📊 Klasifikasi Label</h3>
+          <div style="margin-bottom:1rem;padding:1rem;background:white;border-radius:var(--radius);border:1.5px solid #86efac">
+            <div style="font-weight:600;color:#166534;font-size:1rem;margin-bottom:.4rem">✅ Positif</div>
+            <div style="font-size:.875rem;color:#166534;opacity:.8">Komentar <strong>tidak mengandung</strong> unsur pelecehan seksual verbal. Termasuk: dukungan kepada korban, kecaman terhadap pelaku, edukasi hukum, opini masyarakat yang menolak pelecehan.</div>
+          </div>
+          <div style="padding:1rem;background:white;border-radius:var(--radius);border:1.5px solid #fca5a5">
+            <div style="font-weight:600;color:#991b1b;font-size:1rem;margin-bottom:.4rem">❌ Negatif</div>
+            <div style="font-size:.875rem;color:#991b1b;opacity:.8">Komentar <strong>mengandung</strong> unsur pelecehan seksual verbal. Termasuk: komentar merendahkan, komentar seksual tidak pantas, normalisasi pelecehan, catcalling digital.</div>
+          </div>
+          <div style="margin-top:1.25rem;padding:1rem;background:var(--sky-100);border-radius:var(--radius);font-size:.82rem;color:var(--sky-800)">
+            <strong>Dataset:</strong> 1.000 komentar dari Platform X, periode Januari 2020 – Mei 2026, bahasa Indonesia, diberi label oleh validator.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Formula -->
+<section class="formula-section">
+  <div class="formula-inner">
+    <h2>Formula ID3 Modifikasi</h2>
+    <p style="opacity:.7;margin-bottom:2rem;font-size:.95rem">Modifikasi entropy Shannon menggunakan transformasi logaritma natural dinormalisasi ke basis-2</p>
+    <div class="formula-block">
+      <div style="color:var(--sky-300);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;font-family:sans-serif">Entropy Modifikasi</div>
+      Ent(D) = <sup>1</sup>/<sub>ln(2)</sub> × [ln(p + n) − <sup>p·ln(p) + n·ln(n)</sup>/<sub>p + n</sub>]
+    </div>
+    <div class="formula-block">
+      <div style="color:var(--sky-300);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;font-family:sans-serif">Entropy Kondisional Atribut A</div>
+      Ent<sub>A</sub>(D) = Σ <sup>|D<sub>j</sub>|</sup>/<sub>|D|</sub> × [ln(|D<sub>j</sub>|) − <sup>p<sub>j</sub></sup>/<sub>|D<sub>j</sub>|</sub>·ln(p<sub>j</sub>) − <sup>n<sub>j</sub></sup>/<sub>|D<sub>j</sub>|</sub>·ln(n<sub>j</sub>)]
+    </div>
+    <div class="formula-block">
+      <div style="color:var(--sky-300);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;font-family:sans-serif">Information Gain</div>
+      Gain(A) = Ent(D) − Ent<sub>A</sub>(D)
+    </div>
+    <div class="formula-note">
+      Sumber: Asrianda, Mawengkang, Sihombing & Nasution (2025) · JUTIF Vol.6 No.5 & EJET Vol.2(13)
+    </div>
+  </div>
+</section>
+
+<!-- Author & References -->
+<section style="background:var(--sky-50)">
+  <div class="about-section">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:start">
+      <!-- Author -->
+      <div>
+        <h2 style="font-family:var(--font-display);font-size:2rem;color:var(--sky-900);margin-bottom:1.5rem">Penulis</h2>
+        <div class="author-card">
+          <div class="author-avatar">👩‍💻</div>
+          <div class="author-name">Rizka Mardiah Putri Buyung Lubis</div>
+          <div class="author-nim">NIM. 220170183</div>
+          <div class="author-meta">
+            <span class="badge badge-sky">Teknik Informatika</span>
+            <span class="badge badge-sky">Fakultas Teknik</span>
+            <span class="badge badge-sky">Universitas Malikussaleh</span>
+            <span class="badge badge-sky">Lhokseumawe, 2026</span>
+          </div>
+          <hr class="divider" style="margin:1.25rem 0">
+          <div style="font-size:.82rem;color:var(--slate-500)">
+            <div style="margin-bottom:.4rem">📧 Pembimbing Utama: <strong>Dr. Asrianda, S.Kom., M.Kom</strong></div>
+            <div>📧 Pembimbing Pendamping: <strong>Dr. Fajriana, S.Si., M.Si</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- References -->
+      <div>
+        <h2 style="font-family:var(--font-display);font-size:2rem;color:var(--sky-900);margin-bottom:1.5rem">Referensi Jurnal Acuan</h2>
+        <div class="ref-card">
+          <div class="ref-title">Evaluating the Impact of Model Complexity on the Accuracy of ID3 and Modified ID3: A Case Study of the Max_Depth Parameter</div>
+          <div class="ref-journal">Jurnal Teknik Informatika (JUTIF) · Vol. 6, No. 5 · October 2025 · Hal. 3707–3718</div>
+          <div class="ref-doi">DOI: 10.52436/1.jutif.2025.6.5.4864</div>
+        </div>
+        <div class="ref-card">
+          <div class="ref-title">Optimization of Marketing Campaigns Using a Modified ID3 Decision Tree Algorithm</div>
+          <div class="ref-journal">Eastern-European Journal of Enterprise Technologies · Vol. 2(13) · 2025 · Hal. 58–70</div>
+          <div class="ref-doi">DOI: 10.15587/1729-4061.2025.327158</div>
+        </div>
+        <div style="margin-top:1.25rem;padding:1rem;background:var(--sky-100);border-radius:var(--radius);font-size:.82rem;color:var(--sky-800)">
+          Kedua jurnal ditulis oleh <strong>Asrianda, Herman Mawengkang, Poltak Sihombing & Mahyuddin K.M. Nasution (2025)</strong> — Universitas Malikussaleh & Universitas Sumatera Utara.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

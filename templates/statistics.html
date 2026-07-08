@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Statistik — VerbaClassify{% endblock %}
+
+{% block extra_head %}
+<style>
+.admin-layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 64px); }
+.sidebar { background: var(--sky-900); color: white; padding: 1.5rem 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.sidebar-section { padding: 0 1rem; margin-bottom: 1.5rem; }
+.sidebar-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--sky-400); padding: 0 .75rem; margin-bottom: .5rem; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; padding: .625rem .75rem; border-radius: var(--radius); color: var(--sky-100); text-decoration: none; font-size: .875rem; font-weight: 500; transition: all .2s; margin-bottom: .15rem; }
+.sidebar-link:hover { background: rgba(255,255,255,.1); }
+.sidebar-link.active { background: var(--sky-600); color: white; }
+.sidebar-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+.sidebar-user { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,.1); margin-top: 1rem; font-size: .8rem; color: var(--sky-300); }
+.sidebar-user strong { display: block; color: white; font-size: .875rem; }
+.admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
+.chart-container { position: relative; height: 280px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } .two-col { grid-template-columns: 1fr; } }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu Utama</div>
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link"><span class="icon">📊</span> Dashboard</a>
+      <a href="{{ url_for('datasets') }}" class="sidebar-link"><span class="icon">📁</span> Dataset</a>
+      <a href="{{ url_for('run_experiment_route') }}" class="sidebar-link"><span class="icon">⚗️</span> Jalankan Eksperimen</a>
+      <a href="{{ url_for('experiments_list') }}" class="sidebar-link"><span class="icon">🧪</span> Hasil Eksperimen</a>
+      <a href="{{ url_for('statistics') }}" class="sidebar-link active"><span class="icon">📈</span> Statistik</a>
+      <a href="{{ url_for('predictions_list') }}" class="sidebar-link"><span class="icon">🔍</span> Riwayat Prediksi</a>
+    </div>
+    <div class="sidebar-user">
+      <strong>{{ session.get('admin_username','Admin') }}</strong>Administrator
+      <br><a href="{{ url_for('logout') }}" style="color:var(--sky-400);text-decoration:none;font-size:.78rem;margin-top:.35rem;display:inline-block">Logout →</a>
+    </div>
+  </aside>
+
+  <div class="admin-content">
+    <div class="page-header">
+      <h1>📈 Statistik Sistem</h1>
+      <p>Ringkasan performa model dan distribusi prediksi</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="margin-bottom:1.75rem">
+      <div class="stat-card"><div class="stat-icon">📁</div><div class="stat-value">{{ stats.total_datasets }}</div><div class="stat-label">Dataset</div></div>
+      <div class="stat-card"><div class="stat-icon">🧪</div><div class="stat-value">{{ stats.total_experiments }}</div><div class="stat-label">Eksperimen</div></div>
+      <div class="stat-card"><div class="stat-icon">🔍</div><div class="stat-value">{{ stats.total_predictions }}</div><div class="stat-label">Prediksi</div></div>
+      <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-value">{% if stats.best_accuracy %}{{ "%.1f%%"|format(stats.best_accuracy*100) }}{% else %}—{% endif %}</div><div class="stat-label">Akurasi Terbaik</div></div>
+    </div>
+
+    <div class="two-col" style="margin-bottom:1.5rem">
+      <!-- Prediction Distribution -->
+      <div class="card">
+        <div class="card-header"><h3>🔍 Distribusi Prediksi Pengguna</h3></div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="predChart"></canvas>
+          </div>
+          <div style="display:flex;justify-content:center;gap:1.5rem;margin-top:1rem;font-size:.85rem">
+            <span style="display:flex;align-items:center;gap:.4rem"><span style="width:12px;height:12px;border-radius:2px;background:#16a34a;display:inline-block"></span>Positif: {{ pred_stats.positif }}</span>
+            <span style="display:flex;align-items:center;gap:.4rem"><span style="width:12px;height:12px;border-radius:2px;background:#dc2626;display:inline-block"></span>Negatif: {{ pred_stats.negatif }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Experiments Comparison -->
+      <div class="card">
+        <div class="card-header"><h3>🧪 Perbandingan Akurasi Eksperimen</h3></div>
+        <div class="card-body">
+          {% if experiments %}
+          <div class="chart-container">
+            <canvas id="expChart"></canvas>
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:3rem;color:var(--slate-400)">Belum ada eksperimen</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Experiments Table -->
+    <div class="card">
+      <div class="card-header"><h3>📊 Tabel Perbandingan Semua Eksperimen</h3></div>
+      <div class="card-body" style="padding:0">
+        {% if experiments %}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Proporsi</th><th>Max Depth</th><th>SMOTE</th>
+                <th>Akurasi</th><th>Presisi</th><th>Recall</th><th>F1-Score</th>
+                <th>Waktu (s)</th>
+                <th>TP</th><th>TN</th><th>FP</th><th>FN</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for exp in experiments %}
+            <tr {% if exp.is_best %}style="background:#fffbeb"{% endif %}>
+              <td>
+                <a href="{{ url_for('experiment_detail', exp_id=exp.id) }}" style="color:var(--sky-700);font-weight:600;text-decoration:none">{{ exp.proportion_label }}</a>
+                {% if exp.is_best %}<span class="badge badge-best" style="margin-left:.35rem">★</span>{% endif %}
+              </td>
+              <td>{{ exp.max_depth }}</td>
+              <td>{{ '✅' if exp.use_smote else '—' }}</td>
+              <td><strong>{{ "%.4f"|format(exp.accuracy) if exp.accuracy else '—' }}</strong></td>
+              <td>{{ "%.4f"|format(exp.precision_score) if exp.precision_score else '—' }}</td>
+              <td>{{ "%.4f"|format(exp.recall_score) if exp.recall_score else '—' }}</td>
+              <td>{{ "%.4f"|format(exp.f1_score) if exp.f1_score else '—' }}</td>
+              <td style="color:#92400e;font-weight:600">{{ "%.4f"|format(exp.execution_time) if exp.execution_time else '—' }}</td>
+              <td>{{ exp.tp or 0 }}</td><td>{{ exp.tn or 0 }}</td><td>{{ exp.fp or 0 }}</td><td>{{ exp.fn or 0 }}</td>
+              <td><span class="badge badge-{{ exp.status }}">{{ exp.status }}</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:2.5rem;color:var(--slate-400)">Belum ada eksperimen selesai</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Prediction Donut Chart
+new Chart(document.getElementById('predChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Positif', 'Negatif'],
+    datasets: [{
+      data: [{{ pred_stats.positif }}, {{ pred_stats.negatif }}],
+      backgroundColor: ['#16a34a', '#dc2626'],
+      borderWidth: 0, hoverOffset: 6
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' prediksi' } } },
+    cutout: '65%'
+  }
+});
+
+{% if experiments %}
+// Experiments Bar Chart
+const expLabels = {{ experiments | map(attribute='proportion_label') | list | tojson }};
+const expAcc = {{ experiments | map(attribute='accuracy') | list | tojson }};
+const expColors = expLabels.map((_, i) => i === 0 ? '#0ea5e9' : '#7dd3fc');
+new Chart(document.getElementById('expChart'), {
+  type: 'bar',
+  data: {
+    labels: expLabels,
+    datasets: [{
+      label: 'Akurasi (%)',
+      data: expAcc.map(v => v ? (v*100).toFixed(2) : 0),
+      backgroundColor: expColors,
+      borderRadius: 8, borderSkipped: false
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: false, min: 60, max: 100, ticks: { callback: v => v + '%' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+{% endif %}
+</script>
+{% endblock %}
