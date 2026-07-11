@@ -16,7 +16,11 @@
 .admin-content { background: var(--sky-50); padding: 2rem; overflow-y: auto; }
 .chart-container { position: relative; height: 280px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+.chart-legend { display:flex; justify-content:center; gap:1.5rem; margin-top:1rem; font-size:.85rem; }
+.chart-legend .dot { width:12px; height:12px; border-radius:2px; display:inline-block; }
 @media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } .two-col { grid-template-columns: 1fr; } }
+@media (max-width:1200px) { .three-col { grid-template-columns: 1fr; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 {% endblock %}
@@ -53,28 +57,83 @@
       <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-value">{% if stats.best_accuracy %}{{ "%.1f%%"|format(stats.best_accuracy*100) }}{% else %}—{% endif %}</div><div class="stat-label">Akurasi Terbaik</div></div>
     </div>
 
-    <div class="two-col" style="margin-bottom:1.5rem">
-      <!-- Prediction Distribution -->
-      <div class="card">
+    <!-- Prediction Distribution -->
+    <div class="card" style="margin-bottom:1.5rem">
         <div class="card-header"><h3>🔍 Distribusi Prediksi Pengguna</h3></div>
         <div class="card-body">
           <div class="chart-container">
             <canvas id="predChart"></canvas>
           </div>
-          <div style="display:flex;justify-content:center;gap:1.5rem;margin-top:1rem;font-size:.85rem">
-            <span style="display:flex;align-items:center;gap:.4rem"><span style="width:12px;height:12px;border-radius:2px;background:#16a34a;display:inline-block"></span>Positif: {{ pred_stats.positif }}</span>
-            <span style="display:flex;align-items:center;gap:.4rem"><span style="width:12px;height:12px;border-radius:2px;background:#dc2626;display:inline-block"></span>Negatif: {{ pred_stats.negatif }}</span>
+          <div class="chart-legend">
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#1f77b4"></span>Positif: {{ pred_stats.positif }}</span>
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#ff7f0e"></span>Negatif: {{ pred_stats.negatif }}</span>
           </div>
         </div>
       </div>
+      
+    <div class="two-col" style="margin-bottom:1.5rem">
 
-      <!-- Experiments Comparison -->
+      <!-- Per-class metric comparison: Accuracy / Precision -->
       <div class="card">
-        <div class="card-header"><h3>🧪 Perbandingan Akurasi Eksperimen</h3></div>
+        <div class="card-header"><h3>🧪 Accuracy per Kelas</h3></div>
         <div class="card-body">
           {% if experiments %}
           <div class="chart-container">
-            <canvas id="expChart"></canvas>
+            <canvas id="accChart"></canvas>
+          </div>
+          <div class="chart-legend">
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#1f77b4"></span>Positif</span>
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#ff7f0e"></span>Negatif</span>
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:3rem;color:var(--slate-400)">Belum ada eksperimen</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>🎯 Precision per Kelas</h3></div>
+        <div class="card-body">
+          {% if experiments %}
+          <div class="chart-container"><canvas id="precChart"></canvas></div>
+          <div class="chart-legend">
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#1f77b4"></span>Positif</span>
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#ff7f0e"></span>Negatif</span>
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:3rem;color:var(--slate-400)">Belum ada eksperimen</div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Per-class metric comparison: Recall / F1-Score -->
+    <div class="two-col" style="margin-bottom:1.5rem">
+
+      <div class="card">
+        <div class="card-header"><h3>📥 Recall per Kelas</h3></div>
+        <div class="card-body">
+          {% if experiments %}
+          <div class="chart-container"><canvas id="recallChart"></canvas></div>
+          <div class="chart-legend">
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#1f77b4"></span>Positif</span>
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#ff7f0e"></span>Negatif</span>
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:3rem;color:var(--slate-400)">Belum ada eksperimen</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>⚖️ F1-Score per Kelas</h3></div>
+        <div class="card-body">
+          {% if experiments %}
+          <div class="chart-container"><canvas id="f1Chart"></canvas></div>
+          <div class="chart-legend">
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#1f77b4"></span>Positif</span>
+            <span style="display:flex;align-items:center;gap:.4rem"><span class="dot" style="background:#ff7f0e"></span>Negatif</span>
           </div>
           {% else %}
           <div style="text-align:center;padding:3rem;color:var(--slate-400)">Belum ada eksperimen</div>
@@ -135,7 +194,7 @@ new Chart(document.getElementById('predChart'), {
     labels: ['Positif', 'Negatif'],
     datasets: [{
       data: [{{ pred_stats.positif }}, {{ pred_stats.negatif }}],
-      backgroundColor: ['#16a34a', '#dc2626'],
+      backgroundColor: ['#1f77b4', '#ff7f0e'],
       borderWidth: 0, hoverOffset: 6
     }]
   },
@@ -147,30 +206,84 @@ new Chart(document.getElementById('predChart'), {
 });
 
 {% if experiments %}
-// Experiments Bar Chart
+const DARK_BLUE = '#1f77b4';
+const DARK_ORANGE = '#ff7f0e';
+
+// Per-experiment metric data. Accuracy itself has no positif/negatif split in the
+// schema (experiments.accuracy is one overall number), so instead of a plain single
+// bar we split it into "Benar" (tp+tn) vs "Salah" (fp+fn) using the confusion-matrix
+// columns already on `experiments` — that gives it the same grouped, two-color,
+// touching-bars look as the precision/recall/f1 charts below.
 const expLabels = {{ experiments | map(attribute='proportion_label') | list | tojson }};
-const expAcc = {{ experiments | map(attribute='accuracy') | list | tojson }};
-const expColors = expLabels.map((_, i) => i === 0 ? '#0ea5e9' : '#7dd3fc');
-new Chart(document.getElementById('expChart'), {
-  type: 'bar',
-  data: {
-    labels: expLabels,
-    datasets: [{
-      label: 'Akurasi (%)',
-      data: expAcc.map(v => v ? (v*100).toFixed(2) : 0),
-      backgroundColor: expColors,
-      borderRadius: 8, borderSkipped: false
-    }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      y: { beginAtZero: false, min: 60, max: 100, ticks: { callback: v => v + '%' } },
-      x: { grid: { display: false } }
+const expTP = {{ experiments | map(attribute='tp') | list | tojson }};
+const expTN = {{ experiments | map(attribute='tn') | list | tojson }};
+const expFP = {{ experiments | map(attribute='fp') | list | tojson }};
+const expFN = {{ experiments | map(attribute='fn') | list | tojson }};
+const expMetrics = {{ exp_metrics | tojson }};
+
+// Grouped bar chart factory: series A (dark blue) + series B (dark orange) bars
+// touch each other within one experiment group, with a gap between experiment groups.
+function makeGroupedChart(canvasId, labels, seriesA, seriesB, labelA, labelB) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: labelA,
+          data: seriesA,
+          backgroundColor: DARK_BLUE,
+          barPercentage: 1.0,
+          categoryPercentage: 0.6,
+          borderRadius: 4,
+          borderSkipped: false
+        },
+        {
+          label: labelB,
+          data: seriesB,
+          backgroundColor: DARK_ORANGE,
+          barPercentage: 1.0,
+          categoryPercentage: 0.6,
+          borderRadius: 4,
+          borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '%' } }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } },
+        x: { grid: { display: false } }
+      }
     }
-  }
+  });
+}
+
+// Accuracy chart: Benar (tp+tn) vs Salah (fp+fn), as % of that experiment's test set
+const accBenar = expLabels.map((_, i) => {
+  const tp = expTP[i] || 0, tn = expTN[i] || 0, fp = expFP[i] || 0, fn = expFN[i] || 0;
+  const total = tp + tn + fp + fn;
+  return total ? ((tp + tn) / total * 100).toFixed(2) : 0;
 });
+const accSalah = expLabels.map((_, i) => {
+  const tp = expTP[i] || 0, tn = expTN[i] || 0, fp = expFP[i] || 0, fn = expFN[i] || 0;
+  const total = tp + tn + fp + fn;
+  return total ? ((fp + fn) / total * 100).toFixed(2) : 0;
+});
+makeGroupedChart('accChart', expLabels, accBenar, accSalah, 'Positif', 'Negatif');
+
+// Precision / Recall / F1 charts: Positif vs Negatif, from experiment_details
+function metricSeries(key) {
+  return expMetrics.map(e => e[key] ? (e[key] * 100).toFixed(2) : 0);
+}
+const metricLabels = expMetrics.map(e => e.label);
+makeGroupedChart('precChart', metricLabels, metricSeries('precision_positif'), metricSeries('precision_negatif'), 'Positif', 'Negatif');
+makeGroupedChart('recallChart', metricLabels, metricSeries('recall_positif'), metricSeries('recall_negatif'), 'Positif', 'Negatif');
+makeGroupedChart('f1Chart', metricLabels, metricSeries('f1_positif'), metricSeries('f1_negatif'), 'Positif', 'Negatif');
 {% endif %}
 </script>
 {% endblock %}
