@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS experiments (
     precision_score FLOAT,
     recall_score FLOAT,
     f1_score FLOAT,
+    macro_precision FLOAT,
+    macro_recall FLOAT,
+    macro_f1 FLOAT,
+    weighted_precision FLOAT,
+    weighted_recall FLOAT,
+    weighted_f1 FLOAT,
+    support INTEGER,
     tp INTEGER, tn INTEGER, fp INTEGER, fn INTEGER,
     execution_time FLOAT,          -- waktu training + prediksi (detik)
     train_time FLOAT,              -- waktu training saja
