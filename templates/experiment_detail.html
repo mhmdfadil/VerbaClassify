@@ -26,8 +26,39 @@
 .cm-fp .cm-val, .cm-fn .cm-val { color: #991b1b; }
 .cm-lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; margin-top: .25rem; font-weight: 600; opacity: .7; }
 
+/* --- Khusus halaman ini: ukuran tetap agar TP/TN/FP/FN tidak "loncat" --- */
+.cm-cell-fixed {
+  width: 108px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.cm-cell-fixed .cm-val { font-size: 1.9rem; font-weight: 700; line-height: 1; }
+.cm-cell-fixed .cm-lbl { margin-top: .3rem; }
+
 .chart-container { position: relative; height: 280px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+.report-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.report-table th, .report-table td { padding: .55rem .9rem; text-align: right; }
+.report-table th:first-child, .report-table td:first-child { text-align: left; }
+.report-table thead th { color: var(--slate-400); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+.report-table tbody td { color: var(--slate-600); }
+.report-table tbody tr.summary-row td { padding-top: .75rem; font-weight: 600; color: var(--sky-800); }
+.report-table tbody tr.summary-row:first-of-type td { padding-top: 1.25rem; }
+.report-table tbody tr.summary-row td:first-child { text-transform: lowercase; font-weight: 500; color: var(--slate-500); }
+
+/* --- Khusus halaman ini: tabel classification report jadi compact, tidak full width --- */
+.report-table-wrap { display: flex; justify-content: center; padding: 1.25rem 1.5rem; }
+.report-table-compact { width: auto; }
+.report-table-compact th, .report-table-compact td { padding: .55rem 1.35rem; white-space: nowrap; }
+.report-table-compact thead th { border-bottom: 1.5px solid var(--sky-100); }
+.report-table-compact tbody tr.summary-row td { border-top: 1px solid var(--sky-100); }
+.report-table-compact thead th { background: transparent; color: var(--sky-700); }
+
 @media (max-width:1024px) { .admin-layout { grid-template-columns: 1fr; } .sidebar { position:static; height:auto; } .two-col { grid-template-columns: 1fr; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -123,23 +154,23 @@
       <div class="card">
         <div class="card-header"><h3>🔲 Confusion Matrix</h3></div>
         <div class="card-body">
-          <div style="display:flex;gap:2rem;align-items:flex-start;flex-wrap:wrap">
+          <div style="display:flex;gap:2rem;align-items:flex-start;justify-content:center;flex-wrap:wrap">
             <div>
               <div style="font-size:.72rem;text-align:center;color:var(--slate-400);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.35rem">Prediksi →</div>
               <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.35rem">
                 <div style="width:80px"></div>
-                <div style="text-align:center;flex:1;font-size:.72rem;color:var(--slate-400);font-weight:600">Positif</div>
-                <div style="text-align:center;flex:1;font-size:.72rem;color:var(--slate-400);font-weight:600">Negatif</div>
+                <div style="text-align:center;width:108px;font-size:.72rem;color:var(--slate-400);font-weight:600">Positif</div>
+                <div style="text-align:center;width:108px;font-size:.72rem;color:var(--slate-400);font-weight:600">Negatif</div>
               </div>
               <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.4rem">
-                <div style="width:80px;font-size:.72rem;color:var(--slate-400);font-weight:600;writing-mode:horizontal-tb">Aktual Pos</div>
-                <div class="cm-cell cm-tp" style="flex:1"><div class="cm-val">{{ exp.tp or 0 }}</div><div class="cm-lbl">TP</div></div>
-                <div class="cm-cell cm-fn" style="flex:1"><div class="cm-val">{{ exp.fn or 0 }}</div><div class="cm-lbl">FN</div></div>
+                <div style="width:80px;font-size:.72rem;color:var(--slate-400);font-weight:600">Aktual Pos</div>
+                <div class="cm-cell cm-tp cm-cell-fixed"><div class="cm-val">{{ exp.tp or 0 }}</div><div class="cm-lbl">TP</div></div>
+                <div class="cm-cell cm-fn cm-cell-fixed"><div class="cm-val">{{ exp.fn or 0 }}</div><div class="cm-lbl">FN</div></div>
               </div>
               <div style="display:flex;gap:.5rem;align-items:center">
                 <div style="width:80px;font-size:.72rem;color:var(--slate-400);font-weight:600">Aktual Neg</div>
-                <div class="cm-cell cm-fp" style="flex:1"><div class="cm-val">{{ exp.fp or 0 }}</div><div class="cm-lbl">FP</div></div>
-                <div class="cm-cell cm-tn" style="flex:1"><div class="cm-val">{{ exp.tn or 0 }}</div><div class="cm-lbl">TN</div></div>
+                <div class="cm-cell cm-fp cm-cell-fixed"><div class="cm-val">{{ exp.fp or 0 }}</div><div class="cm-lbl">FP</div></div>
+                <div class="cm-cell cm-tn cm-cell-fixed"><div class="cm-val">{{ exp.tn or 0 }}</div><div class="cm-lbl">TN</div></div>
               </div>
             </div>
             <div style="font-size:.8rem;color:var(--slate-600)">
@@ -155,25 +186,50 @@
         </div>
       </div>
 
-      <!-- Per-class Metrics -->
+      <!-- Classification Report -->
       <div class="card">
-        <div class="card-header"><h3>📊 Metrik Per Kelas</h3></div>
+        <div class="card-header"><h3>📊 Classification Report</h3></div>
         <div class="card-body" style="padding:0">
           {% if details %}
-          <table>
-            <thead><tr><th>Kelas</th><th>Presisi</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr></thead>
+          <div class="report-table-wrap">
+          <table class="report-table report-table-compact">
+            <thead>
+              <tr><th></th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr>
+            </thead>
             <tbody>
-            {% for d in details %}
-            <tr>
-              <td><span class="badge badge-{{ d.class_label }}">{{ d.class_label }}</span></td>
-              <td><strong>{{ "%.3f"|format(d.precision_val or 0) }}</strong></td>
-              <td><strong>{{ "%.3f"|format(d.recall_val or 0) }}</strong></td>
-              <td><strong>{{ "%.3f"|format(d.f1_val or 0) }}</strong></td>
-              <td>{{ d.support }}</td>
-            </tr>
-            {% endfor %}
+              {% for d in details %}
+              <tr>
+                <td>{{ d.class_label }}</td>
+                <td>{{ "%.2f"|format(d.precision_val or 0) }}</td>
+                <td>{{ "%.2f"|format(d.recall_val or 0) }}</td>
+                <td>{{ "%.2f"|format(d.f1_val or 0) }}</td>
+                <td>{{ d.support }}</td>
+              </tr>
+              {% endfor %}
+              <tr class="summary-row">
+                <td>accuracy</td>
+                <td></td>
+                <td></td>
+                <td>{{ "%.2f"|format(exp.accuracy or 0) }}</td>
+                <td>{{ exp.support or exp.test_count or '—' }}</td>
+              </tr>
+              <tr class="summary-row">
+                <td>macro avg</td>
+                <td>{{ "%.2f"|format(exp.macro_precision or 0) }}</td>
+                <td>{{ "%.2f"|format(exp.macro_recall or 0) }}</td>
+                <td>{{ "%.2f"|format(exp.macro_f1 or 0) }}</td>
+                <td>{{ exp.support or exp.test_count or '—' }}</td>
+              </tr>
+              <tr class="summary-row">
+                <td>weighted avg</td>
+                <td>{{ "%.2f"|format(exp.weighted_precision or 0) }}</td>
+                <td>{{ "%.2f"|format(exp.weighted_recall or 0) }}</td>
+                <td>{{ "%.2f"|format(exp.weighted_f1 or 0) }}</td>
+                <td>{{ exp.support or exp.test_count or '—' }}</td>
+              </tr>
             </tbody>
           </table>
+          </div>
           {% else %}
           <div style="padding:1.5rem;color:var(--slate-400);text-align:center;font-size:.875rem">Data per kelas tidak tersedia</div>
           {% endif %}
